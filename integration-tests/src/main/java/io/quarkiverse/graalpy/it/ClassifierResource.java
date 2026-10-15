@@ -1,4 +1,4 @@
-package org.acme;
+package io.quarkiverse.graalpy.it;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;

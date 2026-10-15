@@ -23,11 +23,11 @@ import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.IOAccess;
 
 /**
- * Programmatic entry point for GraalPy. Exposes a fluent API:
+ * Fluent entry point for calling Python from Java.
  *
- * <pre>graalPy.module("classifier").function("predict").invoke(features).as(Prediction.class);</pre>
- *
- * Calls are serialized because a Polyglot {@link Context} must not be entered concurrently.
+ * <pre>
+ * graalPy.module("classifier").function("predict").invoke(features).as(Prediction.class);
+ * </pre>
  */
 @ApplicationScoped
 public class GraalPy {

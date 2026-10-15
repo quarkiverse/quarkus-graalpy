@@ -1,14 +1,21 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>io.quarkiverse.graalpy</groupId>
         <artifactId>quarkus-graalpy-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>999-SNAPSHOT</version>
     </parent>
+
     <artifactId>quarkus-graalpy-integration-tests</artifactId>
+    <name>Quarkus GraalPy - Integration Tests</name>
+
     <dependencies>
         <dependency>
-            <groupId>io.quarkiverse.graalpy</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>quarkus-graalpy</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -31,6 +38,7 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
@@ -49,9 +57,15 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.3</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>

@@ -36,13 +36,13 @@ import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.Produce;
-import io.quarkus.deployment.pkg.builditem.ArtifactResultBuildItem;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.NativeImageResourceBuildItem;
+import io.quarkus.deployment.pkg.builditem.ArtifactResultBuildItem;
 import io.quarkus.deployment.pkg.builditem.OutputTargetBuildItem;
 import io.quarkus.gizmo.ClassCreator;
 import io.quarkus.gizmo.ClassOutput;
@@ -88,7 +88,6 @@ public class GraalPyProcessor {
             packageDirectory(projectRoot.resolve(config.testSourceDir()), GraalPy.TEST_RESOURCE_ROOT,
                     GraalPy.TEST_MANIFEST_RESOURCE, generatedResources, nativeResources, watched);
         } else {
-            // Still watch the dir in dev mode so a new test source triggers a restart when switching to tests.
             watchDirectoryAdditions(projectRoot.resolve(config.testSourceDir()), watched);
         }
     }
@@ -124,10 +123,6 @@ public class GraalPyProcessor {
         watchDirectoryAdditions(sourceRoot, watched);
     }
 
-    /**
-     * Register a predicate that triggers a restart whenever any {@code .py} file under
-     * {@code dir} is added, modified or removed, even if it did not exist at build time.
-     */
     private void watchDirectoryAdditions(Path dir, BuildProducer<HotDeploymentWatchedFileBuildItem> watched) {
         String prefix = dir.toAbsolutePath().toString();
         watched.produce(HotDeploymentWatchedFileBuildItem.builder()
@@ -187,7 +182,7 @@ public class GraalPyProcessor {
                             "__import__('" + moduleName.replace("'", "\\'") + "', None, None, ['*'])");
                 } catch (PolyglotException e) {
                     errors.add("@GraalPyModuleBinding(\"" + moduleName + "\") on " + iface.name()
-                            + " — module not importable: " + firstLine(e.getMessage()));
+                            + ": module not importable: " + firstLine(e.getMessage()));
                     continue;
                 }
                 for (MethodInfo method : iface.methods()) {
@@ -201,7 +196,7 @@ public class GraalPyProcessor {
                     Value member = module.getMember(fnName);
                     if (member == null || !member.canExecute()) {
                         errors.add("@GraalPyModuleBinding(\"" + moduleName + "\") on " + iface.name()
-                                + " — missing callable '" + fnName + "' (for method " + method.name() + ")");
+                                + ": missing callable '" + fnName + "' (for method " + method.name() + ")");
                     }
                 }
             }

@@ -1,6 +1,6 @@
 :project-name: Quarkus GraalPy
 :extension-coordinates: io.quarkiverse.graalpy:quarkus-graalpy
-:extension-version: 0.1.0-SNAPSHOT
+:extension-version: 999-SNAPSHOT
 :quarkus-version: 3.27.0
 :graalpy-version: 25.0.0
 :issue-url: https://github.com/quarkusio/quarkus/issues/56029
