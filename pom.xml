@@ -29,7 +29,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.version>3.27.0</quarkus.version>
-        <graalpy.version>25.0.0</graalpy.version>
+        <graalpy.version>25.4.4.1.1</graalpy.version>
     </properties>
 
     <modules>
