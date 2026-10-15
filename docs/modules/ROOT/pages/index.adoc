@@ -1,0 +1,224 @@
+= Quarkus GraalPy
+include::includes/attributes.adoc[]
+:toc: left
+:toclevels: 3
+:sectlinks:
+:sectanchors:
+
+{project-name} is a Quarkus extension that embeds https://www.graalvm.org/python/[GraalPy] in Java applications and exposes it through idiomatic Quarkus APIs — a managed `Context`, a fluent programmatic API, and declarative Java-to-Python bindings generated at build time.
+
+The design follows the proposal in {issue-url}[quarkusio/quarkus#56029].
+
+== Why
+
+Calling Python from Java through the raw GraalVM Polyglot API means managing `Context` lifecycles, module imports, and type conversions by hand. This extension removes that boilerplate so Python code integrates like any other Quarkus bean:
+
+* `src/main/python/` is a conventional source root (like `src/main/java/`), auto-packaged into the runtime classpath.
+* `src/test/python/` is picked up in test mode for Python test helpers.
+* `@GraalPyModuleBinding` on a Java interface produces a CDI bean at build time that maps methods to Python functions.
+* `@GraalPyFunction` remaps a Java method name to a Python function name.
+* A CDI-managed `GraalPy` bean is available for ad-hoc programmatic calls.
+* Build-time validation surfaces missing modules or functions before the app starts.
+* Dev Mode: edits under `src/main/python/` trigger a reload.
+
+== Getting started
+
+Install the extension in your `pom.xml`:
+
+[source,xml,subs=attributes+]
+----
+<dependency>
+    <groupId>io.quarkiverse.graalpy</groupId>
+    <artifactId>quarkus-graalpy</artifactId>
+    <version>{extension-version}</version>
+</dependency>
+----
+
+Add Python code under `src/main/python/`:
+
+[source,python]
+----
+include::example$classifier.py[]
+----
+
+Point the extension at it in `src/main/resources/application.properties`:
+
+[source,properties]
+----
+include::example$application.properties[]
+----
+
+Call it from Java — either programmatically or through a declarative binding.
+
+== Programmatic API
+
+Inject the `GraalPy` bean and call a module/function fluently:
+
+[source,java]
+----
+include::example$GraalPyApplication.java[]
+----
+
+The chain is:
+
+[source,java]
+----
+graalPy.module("classifier")   // resolves and imports a Python module
+       .function("predict")    // picks a callable from that module
+       .invoke(features)       // executes with Java args marshalled to Python
+       .as(Prediction.class);  // maps the return value to a Java type
+----
+
+Calls through a single `GraalPy` bean are serialized — a Polyglot `Context` must not be entered concurrently.
+
+== Declarative bindings
+
+For strongly-typed usage, declare a Java interface and annotate it:
+
+[source,java]
+----
+@GraalPyModuleBinding("classifier")
+public interface Classifier {
+
+    Prediction predict(float[] features);
+
+    @GraalPyFunction("calculate_stddev")
+    double standardDeviation(double[] values);
+}
+----
+
+At build time the extension scans every `@GraalPyModuleBinding` interface via Jandex and generates an `@ApplicationScoped` implementation with Gizmo. Each method body resolves to:
+
+[source,java]
+----
+graalPy.module(moduleName)
+       .function(fnName)
+       .invoke(args)
+       .as(returnType);
+----
+
+Function names default to the Java method name; `@GraalPyFunction("name")` overrides that mapping. Primitive parameters and returns are boxed/unboxed automatically.
+
+Inject it like any CDI bean:
+
+[source,java]
+----
+@Inject
+Classifier classifier;
+
+Prediction p = classifier.predict(new float[]{0.2f, -0.1f, 0.9f});
+----
+
+Return the result through an interface whose methods map to attributes on the Python object (as in `types.SimpleNamespace`, a `dataclass`, or any object with the matching attributes).
+
+== Build-time validation
+
+Set `quarkus.graalpy.validate-bindings=true` to have the build open a GraalPy context during augmentation, import each bound module, and verify every method maps to a callable. Failures abort the build with a consolidated report:
+
+[source]
+----
+GraalPy binding validation failed (2 issue(s)):
+  - @GraalPyModuleBinding("classifier") on org.acme.Classifier — missing callable 'predict_v2' (for method predictV2)
+  - @GraalPyModuleBinding("statistics") on org.acme.Stats — module not importable: ModuleNotFoundError: No module named 'statistics'
+----
+
+Recommended usage is `%dev.quarkus.graalpy.validate-bindings=true` to catch mistakes without paying the extra context startup in production builds.
+
+== Dev Mode
+
+Any addition, removal, or modification of a `.py` file under `src/main/python/` triggers a Quarkus live reload. The managed `GraalPy` bean is destroyed (its `@PreDestroy` closes the Polyglot context) and the next call rebuilds a fresh context against the updated sources.
+
+[source,bash]
+----
+mvn quarkus:dev
+----
+
+=== Loading Python sources from an arbitrary filesystem path
+
+In addition to the packaged sources under `src/main/python/`, you can point the runtime at any directory on disk via `quarkus.graalpy.source-path`. The directory is prepended to `sys.path`, so modules there take precedence over packaged ones with the same name — useful when iterating on scripts kept outside the project or shared across apps.
+
+[source,properties]
+----
+%dev.quarkus.graalpy.source-path=/home/me/python-scripts
+----
+
+The directory must exist at startup; otherwise the entry is silently skipped.
+
+== Test Python sources
+
+In test launch mode the extension also packages `src/test/python/` under a separate resource root and adds it to `sys.path`. Use it for Python fixtures that must not leak into production:
+
+[source]
+----
+src/
+├── main/
+│   └── python/
+│       └── classifier.py
+└── test/
+    └── python/
+        └── fixtures.py
+----
+
+[source,java]
+----
+@QuarkusTest
+class FixturesTest {
+
+    @Inject
+    GraalPy graalPy;
+
+    @Test
+    void loadsTestOnlyModule() {
+        Prediction p = graalPy.module("fixtures")
+                .function("canned_prediction")
+                .invoke()
+                .as(Prediction.class);
+        assertEquals("canned", p.label());
+    }
+}
+----
+
+Toggle off with `quarkus.graalpy.include-test-sources=false`.
+
+== Configuration
+
+[cols="2,1,3",options="header"]
+|===
+| Property | Default | Description
+| `quarkus.graalpy.source-dir` | `src/main/python` | Project-relative directory holding application Python sources, packaged into classpath resources at build time.
+| `quarkus.graalpy.test-source-dir` | `src/test/python` | Project-relative directory holding test Python sources, packaged in `test` launch mode only.
+| `quarkus.graalpy.include-test-sources` | `true` | Whether to include `test-source-dir` when running tests.
+| `quarkus.graalpy.validate-bindings` | `false` | When `true`, the build fails if any `@GraalPyModuleBinding` references a missing module/function. Recommended in `%dev`.
+| `quarkus.graalpy.source-path` | _unset_ | Filesystem path prepended to `sys.path` at runtime (in addition to the packaged sources). Useful in dev mode when the project directory is accessible.
+|===
+
+== Testing
+
+The programmatic API works in `@QuarkusTest` without extra setup — the `GraalPy` bean is CDI-managed and reads the same configuration:
+
+[source,java]
+----
+@QuarkusTest
+class ClassifierTest {
+
+    @Inject
+    Classifier classifier;
+
+    @Test
+    void predictsPositive() {
+        Prediction p = classifier.predict(new float[]{0.5f, 0.6f});
+        assertEquals("positive", p.label());
+    }
+}
+----
+
+== Limitations
+
+The following items from the upstream proposal are **not yet implemented**:
+
+* Native image support (and documentation of C extension / wheel limitations).
+* Full integration with `python-embedding` for PyPI dependency management (`requirements.txt`, venv handling via `graalpy-maven-plugin`).
+* Typed `GraalPyException` hierarchy for import / execution failures (currently surfaces as `PolyglotException`).
+* Extended type conversions beyond what GraalPy's default `Value.as(Class)` covers (e.g. `BigDecimal`, `LocalDate`, custom collection generics).
+
+Contributions tracking any of these are welcome — see {issue-url}[the upstream proposal] for the full roadmap.

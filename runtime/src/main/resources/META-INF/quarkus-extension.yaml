@@ -1,0 +1,12 @@
+---
+name: "Quarkus GraalPy"
+artifact: "io.quarkiverse.graalpy:quarkus-graalpy:${project.version}"
+description: "Run GraalPy from Quarkus with managed Context, declarative module bindings, and Python source packaging."
+metadata:
+  keywords:
+    - "graalpy"
+    - "python"
+    - "polyglot"
+  categories:
+    - "integration"
+  status: "experimental"

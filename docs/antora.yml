@@ -1,0 +1,6 @@
+name: quarkus-graalpy
+title: GraalPy
+version: dev
+display_version: dev (main)
+nav:
+  - modules/ROOT/nav.adoc
